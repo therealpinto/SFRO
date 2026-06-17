@@ -3,250 +3,216 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SFRO Swish QR-generator</title>
+  <title>SFRO Swish QR-generator med OCR</title>
   <style>
-    :root {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      color: #222;
-      background: #f5f5f5;
-    }
-
-    body {
-      margin: 0;
-      padding: 24px;
-    }
-
-    .card {
-      max-width: 520px;
-      margin: 0 auto;
-      background: #fff;
-      border-radius: 14px;
-      padding: 22px;
-      box-shadow: 0 8px 28px rgba(0,0,0,0.08);
-    }
-
-    h1 {
-      margin-top: 0;
-      font-size: 1.45rem;
-    }
-
-    label {
-      display: block;
-      font-weight: 650;
-      margin-top: 16px;
-      margin-bottom: 6px;
-    }
-
-    input {
-      width: 100%;
-      box-sizing: border-box;
-      padding: 12px;
-      font-size: 1rem;
-      border: 1px solid #bbb;
-      border-radius: 8px;
-    }
-
-    button {
-      width: 100%;
-      margin-top: 18px;
-      padding: 13px;
-      font-size: 1rem;
-      font-weight: 700;
-      border: 0;
-      border-radius: 8px;
-      background: #111;
-      color: #fff;
-      cursor: pointer;
-    }
-
-    button.secondary {
-      background: #555;
-      margin-top: 10px;
-    }
-
-    .result {
-      margin-top: 22px;
-      text-align: center;
-    }
-
-    .result img {
-      width: 280px;
-      max-width: 100%;
-      height: auto;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      padding: 8px;
-      background: #fff;
-    }
-
-    .check {
-      text-align: left;
-      margin-top: 16px;
-      padding: 12px;
-      background: #f0f0f0;
-      border-radius: 8px;
-      font-size: 0.95rem;
-      line-height: 1.45;
-    }
-
-    .error {
-      margin-top: 16px;
-      padding: 12px;
-      color: #8a0000;
-      background: #ffecec;
-      border: 1px solid #f2b8b8;
-      border-radius: 8px;
-    }
-
-    .hint {
-      color: #666;
-      font-size: 0.9rem;
-      line-height: 1.35;
-    }
-
-    .payload {
-      word-break: break-all;
-      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-      font-size: 0.8rem;
-      margin-top: 10px;
-      color: #555;
-    }
+    :root { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color:#222; background:#f5f5f5; }
+    body { margin:0; padding:20px; }
+    .card { max-width:560px; margin:0 auto; background:#fff; border-radius:14px; padding:22px; box-shadow:0 8px 28px rgba(0,0,0,.08); }
+    h1 { margin-top:0; font-size:1.45rem; }
+    h2 { font-size:1.1rem; margin-top:24px; border-top:1px solid #ddd; padding-top:18px; }
+    label { display:block; font-weight:650; margin-top:16px; margin-bottom:6px; }
+    input, textarea { width:100%; box-sizing:border-box; padding:12px; font-size:1rem; border:1px solid #bbb; border-radius:8px; }
+    textarea { min-height:120px; resize:vertical; font-family:ui-monospace, SFMono-Regular, Consolas, monospace; font-size:.85rem; }
+    button { width:100%; margin-top:14px; padding:13px; font-size:1rem; font-weight:700; border:0; border-radius:8px; background:#111; color:#fff; cursor:pointer; }
+    button.secondary { background:#555; }
+    button:disabled { background:#999; cursor:wait; }
+    .result { margin-top:22px; text-align:center; }
+    .result img { width:280px; max-width:100%; height:auto; border:1px solid #ddd; border-radius:8px; padding:8px; background:#fff; }
+    .check { text-align:left; margin-top:16px; padding:12px; background:#f0f0f0; border-radius:8px; font-size:.95rem; line-height:1.45; }
+    .error { margin-top:16px; padding:12px; color:#8a0000; background:#ffecec; border:1px solid #f2b8b8; border-radius:8px; }
+    .ok { margin-top:16px; padding:12px; color:#064d18; background:#eaf8ee; border:1px solid #aadbb8; border-radius:8px; }
+    .hint { color:#666; font-size:.9rem; line-height:1.35; }
+    .small { font-size:.85rem; color:#666; }
+    .preview { display:none; width:100%; max-height:320px; object-fit:contain; margin-top:12px; border:1px solid #ddd; border-radius:8px; background:#fafafa; }
+    .payload { word-break:break-all; font-family:ui-monospace, SFMono-Regular, Consolas, monospace; font-size:.8rem; margin-top:10px; color:#555; display:none; }
   </style>
 </head>
-
 <body>
   <main class="card">
     <h1>SFRO Swish QR-generator</h1>
+    <p class="hint">Fyll i manuellt eller fotografera/ladda upp en bild av blanketten. OCR-funktionen försöker hitta blankettnummer och belopp, men kontrollera alltid fälten innan QR-koden används.</p>
 
-    <p class="hint">
-      Fyll i blankett-/ärendenummer och belopp. QR-koden öppnar Swish med mottagare,
-      belopp och meddelande förifyllt.
-    </p>
+    <h2>1. Läs blankett med kamera/OCR</h2>
+    <label for="photoInput">Fotografera eller välj bild</label>
+    <input id="photoInput" type="file" accept="image/*" capture="environment">
+    <img id="preview" class="preview" alt="Förhandsvisning av vald bild">
+    <button id="ocrBtn" type="button" class="secondary">Läs bild med OCR</button>
+    <div id="ocrStatus" class="small"></div>
+    <label for="ocrText">OCR-text</label>
+    <textarea id="ocrText" placeholder="Här visas texten som OCR hittar i bilden."></textarea>
+    <button id="parseBtn" type="button" class="secondary">Tolka OCR-text till fält</button>
 
+    <h2>2. Kontrollera betalningsuppgifter</h2>
     <label for="message">Blankettnummer / meddelande</label>
     <input id="message" type="text" placeholder="Exempel: SFRO 12345" autocomplete="off">
-
     <label for="amount">Belopp, SEK</label>
     <input id="amount" type="text" inputmode="decimal" placeholder="Exempel: 500 eller 500,00">
-
     <button id="generateBtn" type="button">Generera Swish-QR</button>
     <button id="clearBtn" class="secondary" type="button">Rensa</button>
-
     <div id="output" class="result"></div>
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script>
-    /*
-      ÄNDRA DETTA:
-      Skriv in rätt Swishnummer. Endast siffror, inget +46, inga mellanslag.
-      Exempel privatnummer: 46701234567
-      Exempel företagsnummer: 1231231234
-    */
-    const SWISH_NUMBER = "1232139483";
-
-    /*
-      Lock mask:
-      0 = inget låst
-      1 = mottagare låst
-      2 = belopp låst
-      3 = belopp och meddelande låst enligt praktisk användning i många implementationer
-      För SFRO är 3 normalt rimligt så att användaren inte råkar ändra belopp/meddelande.
-    */
+    const SWISH_NUMBER = "123XXXXXXX"; // Ändra till rätt Swishnummer, bara siffror.
     const LOCK_MASK = "3";
 
+    const photoInputEl = document.getElementById("photoInput");
+    const previewEl = document.getElementById("preview");
+    const ocrBtnEl = document.getElementById("ocrBtn");
+    const ocrStatusEl = document.getElementById("ocrStatus");
+    const ocrTextEl = document.getElementById("ocrText");
+    const parseBtnEl = document.getElementById("parseBtn");
     const messageEl = document.getElementById("message");
     const amountEl = document.getElementById("amount");
     const outputEl = document.getElementById("output");
+    let selectedImageFile = null;
 
+    photoInputEl.addEventListener("change", function () {
+      selectedImageFile = photoInputEl.files && photoInputEl.files[0] ? photoInputEl.files[0] : null;
+      outputEl.innerHTML = "";
+      ocrStatusEl.textContent = "";
+      if (selectedImageFile) {
+        previewEl.src = URL.createObjectURL(selectedImageFile);
+        previewEl.style.display = "block";
+      } else {
+        previewEl.removeAttribute("src");
+        previewEl.style.display = "none";
+      }
+    });
+
+    ocrBtnEl.addEventListener("click", runOcr);
+    parseBtnEl.addEventListener("click", parseOcrText);
     document.getElementById("generateBtn").addEventListener("click", generateQr);
     document.getElementById("clearBtn").addEventListener("click", clearForm);
 
-    amountEl.addEventListener("keydown", function (event) {
-      if (event.key === "Enter") generateQr();
-    });
+    async function runOcr() {
+      outputEl.innerHTML = "";
+      if (!selectedImageFile) { showError("Välj eller fotografera en bild först."); return; }
+      if (typeof Tesseract === "undefined") { showError("OCR-biblioteket kunde inte laddas. Ladda om sidan och testa igen."); return; }
 
-    messageEl.addEventListener("keydown", function (event) {
-      if (event.key === "Enter") generateQr();
-    });
+      ocrBtnEl.disabled = true;
+      ocrStatusEl.textContent = "Läser bild... första gången kan ta en stund.";
+
+      try {
+        const result = await Tesseract.recognize(selectedImageFile, "swe+eng", {
+          logger: function (m) {
+            if (m.status) {
+              const pct = typeof m.progress === "number" ? " " + Math.round(m.progress * 100) + "%" : "";
+              ocrStatusEl.textContent = m.status + pct;
+            }
+          }
+        });
+
+        const text = result && result.data && result.data.text ? result.data.text.trim() : "";
+        ocrTextEl.value = text;
+
+        if (!text) {
+          showError("OCR hittade ingen text. Prova bättre ljus, rakare bild eller närmare foto.");
+        } else {
+          ocrStatusEl.innerHTML = "<div class='ok'>OCR klar. Kontrollera texten och klicka sedan på ”Tolka OCR-text till fält”.</div>";
+          parseOcrText();
+        }
+      } catch (error) {
+        showError("OCR misslyckades: " + error.message);
+        ocrStatusEl.textContent = "";
+      } finally {
+        ocrBtnEl.disabled = false;
+      }
+    }
+
+    function parseOcrText() {
+      outputEl.innerHTML = "";
+      const text = ocrTextEl.value || "";
+      if (!text.trim()) { showError("Det finns ingen OCR-text att tolka."); return; }
+
+      const amount = findAmount(text);
+      const message = findFormNumber(text);
+
+      if (amount) amountEl.value = amount;
+      if (message) messageEl.value = message;
+
+      if (amount || message) {
+        outputEl.innerHTML = "<div class='ok'>Tolkning klar. Kontrollera fälten innan QR-koden genereras." +
+          (!message ? "<br>Blankettnummer hittades inte säkert." : "") +
+          (!amount ? "<br>Belopp hittades inte säkert." : "") + "</div>";
+      } else {
+        showError("Kunde inte hitta blankettnummer eller belopp säkert. Fyll i fälten manuellt eller justera OCR-texten.");
+      }
+    }
+
+    function findAmount(text) {
+      const normalized = text.replace(/\u00a0/g, " ").replace(/[Oo]/g, "0");
+      const patterns = [
+        /(?:belopp|summa|att betala|totalt|sek|kr)\D{0,20}(\d{1,3}(?:[ .]\d{3})*(?:[,.]\d{1,2})?|\d+(?:[,.]\d{1,2})?)/i,
+        /(\d{1,3}(?:[ .]\d{3})*(?:[,.]\d{2})|\d+[,.]\d{2})\s*(?:kr|sek)?/i,
+        /(\d{2,6})\s*(?:kr|sek)/i
+      ];
+      for (const pattern of patterns) {
+        const match = normalized.match(pattern);
+        if (match && match[1]) return normalizeAmount(match[1]);
+      }
+      return "";
+    }
+
+    function findFormNumber(text) {
+      const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+      const joined = lines.join(" ");
+      const patterns = [
+        /(?:blankett(?:nummer|nr)?|ärende(?:nummer|nr)?|besiktnings(?:nummer|nr)?|protokoll(?:nummer|nr)?|sfro)\D{0,20}([A-ZÅÄÖ]{0,5}\s*\d{3,8}(?:[-/]\d{1,4})?)/i,
+        /(SFRO\D{0,10}\d{3,8}(?:[-/]\d{1,4})?)/i,
+        /(?:nr|no|nummer)\D{0,10}(\d{3,8}(?:[-/]\d{1,4})?)/i
+      ];
+
+      for (const pattern of patterns) {
+        const match = joined.match(pattern);
+        if (match && match[1]) return cleanMessage(match[1]);
+      }
+
+      for (const line of lines) {
+        if (/belopp|summa|kr|sek|datum|telefon|mobil/i.test(line)) continue;
+        const match = line.match(/[A-ZÅÄÖ]{0,5}\s*\d{4,8}(?:[-/]\d{1,4})?/i);
+        if (match) return cleanMessage(match[0]);
+      }
+      return "";
+    }
+
+    function cleanMessage(value) {
+      return String(value || "").replace(/\s+/g, " ").replace(/[|]/g, "I").trim().substring(0, 50);
+    }
 
     function normalizeAmount(raw) {
-      let value = String(raw || "")
-        .trim()
-        .replace(/\s/g, "")
-        .replace(".", ",");
-
-      if (!value) {
-        throw new Error("Ange belopp.");
+      let value = String(raw || "").trim().replace(/\s/g, "").replace(/\./g, ",");
+      const commaCount = (value.match(/,/g) || []).length;
+      if (commaCount > 1) {
+        const lastComma = value.lastIndexOf(",");
+        value = value.slice(0, lastComma).replace(/,/g, "") + value.slice(lastComma);
       }
-
-      if (!/^\d+(,\d{1,2})?$/.test(value)) {
-        throw new Error("Ange belopp som till exempel 500 eller 500,00.");
-      }
-
-      if (!value.includes(",")) {
-        value += ",00";
-      } else if (/,\d$/.test(value)) {
-        value += "0";
-      }
-
+      if (!value) throw new Error("Ange belopp.");
+      if (!/^\d+(,\d{1,2})?$/.test(value)) throw new Error("Ange belopp som till exempel 500 eller 500,00.");
+      if (!value.includes(",")) value += ",00";
+      else if (/,\d$/.test(value)) value += "0";
       const numeric = Number(value.replace(",", "."));
-      if (!Number.isFinite(numeric) || numeric <= 0) {
-        throw new Error("Beloppet måste vara större än 0 kr.");
-      }
-
+      if (!Number.isFinite(numeric) || numeric <= 0) throw new Error("Beloppet måste vara större än 0 kr.");
       return value;
     }
 
     function validateSwishNumber(number) {
-      if (!/^\d+$/.test(number)) {
-        throw new Error("Swishnumret måste bara innehålla siffror. Ändra SWISH_NUMBER i HTML-filen.");
-      }
-
-      if (number === "123XXXXXXX") {
-        throw new Error("Du måste först ändra SWISH_NUMBER i HTML-filen till rätt Swishnummer.");
-      }
+      if (!/^\d+$/.test(number)) throw new Error("Swishnumret måste bara innehålla siffror. Ändra SWISH_NUMBER i HTML-filen.");
+      if (number === "1232139483") throw new Error("Du måste först ändra SWISH_NUMBER i HTML-filen till rätt Swishnummer.");
     }
 
     function generateQr() {
       outputEl.innerHTML = "";
-
       try {
         validateSwishNumber(SWISH_NUMBER);
-
         const message = messageEl.value.trim();
         const amount = normalizeAmount(amountEl.value);
+        if (!message) throw new Error("Ange blankettnummer eller meddelande.");
+        if (message.length > 50) throw new Error("Meddelandet är långt. Kortare meddelande rekommenderas för Swish.");
 
-        if (!message) {
-          throw new Error("Ange blankettnummer eller meddelande.");
-        }
-
-        if (message.length > 50) {
-          throw new Error("Meddelandet är långt. Kortare meddelande rekommenderas för Swish.");
-        }
-
-        /*
-          Swish QR C2B-format:
-          C<swishnummer>;<belopp>;<meddelande>;<lock_mask>
-
-          Meddelandet URL-kodas i payloaden så att å, ä, ö, mellanslag och specialtecken fungerar.
-        */
-        const payload =
-          "C" +
-          SWISH_NUMBER +
-          ";" +
-          amount +
-          ";" +
-          encodeURIComponent(message) +
-          ";" +
-          LOCK_MASK;
-
-        /*
-          QR-bilden genereras via en bild-URL.
-          Fördelen är att sidan slipper ladda ett separat JavaScript-bibliotek.
-        */
-        const qrUrl =
-          "https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=12&data=" +
-          encodeURIComponent(payload);
+        const payload = "C" + SWISH_NUMBER + ";" + amount + ";" + encodeURIComponent(message) + ";" + LOCK_MASK;
+        const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=12&data=" + encodeURIComponent(payload);
 
         const img = document.createElement("img");
         img.src = qrUrl;
@@ -254,8 +220,7 @@
 
         const check = document.createElement("div");
         check.className = "check";
-        check.innerHTML =
-          "<strong>Kontrollera innan betalning:</strong><br>" +
+        check.innerHTML = "<strong>Kontrollera innan betalning:</strong><br>" +
           "Swishnummer: " + escapeHtml(SWISH_NUMBER) + "<br>" +
           "Belopp: " + escapeHtml(amount) + " kr<br>" +
           "Meddelande: " + escapeHtml(message) +
@@ -269,6 +234,12 @@
     }
 
     function clearForm() {
+      photoInputEl.value = "";
+      selectedImageFile = null;
+      previewEl.removeAttribute("src");
+      previewEl.style.display = "none";
+      ocrTextEl.value = "";
+      ocrStatusEl.textContent = "";
       messageEl.value = "";
       amountEl.value = "";
       outputEl.innerHTML = "";
@@ -280,12 +251,7 @@
     }
 
     function escapeHtml(value) {
-      return String(value)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+      return String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
     }
   </script>
 </body>

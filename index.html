@@ -30,7 +30,10 @@
 <body>
   <main class="card">
     <h1>SFRO Swish QR-generator</h1>
-    <p class="hint">Fyll i manuellt eller fotografera/ladda upp en bild av blanketten. OCR-funktionen försöker hitta blankettnummer och belopp, men kontrollera alltid fälten innan QR-koden används.</p>
+    <p class="hint">
+      Fotografera helst första sidan/kontantfakturan. OCR-regeln letar efter blankettnummer uppe till höger:
+      B, M eller DB följt av siffror, samt summan under ”Betalt (inkl moms)”.
+    </p>
 
     <h2>1. Läs blankett med kamera/OCR</h2>
     <label for="photoInput">Fotografera eller välj bild</label>
@@ -38,15 +41,18 @@
     <img id="preview" class="preview" alt="Förhandsvisning av vald bild">
     <button id="ocrBtn" type="button" class="secondary">Läs bild med OCR</button>
     <div id="ocrStatus" class="small"></div>
+
     <label for="ocrText">OCR-text</label>
     <textarea id="ocrText" placeholder="Här visas texten som OCR hittar i bilden."></textarea>
     <button id="parseBtn" type="button" class="secondary">Tolka OCR-text till fält</button>
 
     <h2>2. Kontrollera betalningsuppgifter</h2>
-    <label for="message">Blankettnummer / meddelande</label>
-    <input id="message" type="text" placeholder="Exempel: SFRO 12345" autocomplete="off">
+    <label for="message">Meddelande / blankettnummer</label>
+    <input id="message" type="text" placeholder="Exempel: B12645" autocomplete="off">
+
     <label for="amount">Belopp, SEK</label>
-    <input id="amount" type="text" inputmode="decimal" placeholder="Exempel: 500 eller 500,00">
+    <input id="amount" type="text" inputmode="decimal" placeholder="Exempel: 5000 eller 5000,00">
+
     <button id="generateBtn" type="button">Generera Swish-QR</button>
     <button id="clearBtn" class="secondary" type="button">Rensa</button>
     <div id="output" class="result"></div>
@@ -54,7 +60,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script>
-    const SWISH_NUMBER = "123XXXXXXX"; // Ändra till rätt Swishnummer, bara siffror.
+    const SWISH_NUMBER = "1232139483"; // Ändra till rätt Swishnummer, bara siffror.
     const LOCK_MASK = "3";
 
     const photoInputEl = document.getElementById("photoInput");
@@ -110,7 +116,7 @@
         if (!text) {
           showError("OCR hittade ingen text. Prova bättre ljus, rakare bild eller närmare foto.");
         } else {
-          ocrStatusEl.innerHTML = "<div class='ok'>OCR klar. Kontrollera texten och klicka sedan på ”Tolka OCR-text till fält”.</div>";
+          ocrStatusEl.innerHTML = "<div class='ok'>OCR klar. Kontrollera texten och fälten innan QR-koden genereras.</div>";
           parseOcrText();
         }
       } catch (error) {
@@ -126,59 +132,97 @@
       const text = ocrTextEl.value || "";
       if (!text.trim()) { showError("Det finns ingen OCR-text att tolka."); return; }
 
-      const amount = findAmount(text);
-      const message = findFormNumber(text);
+      const message = findSfroMessage(text);
+      const amount = findPaidIncludingVatAmount(text);
 
-      if (amount) amountEl.value = amount;
       if (message) messageEl.value = message;
+      if (amount) amountEl.value = amount;
 
-      if (amount || message) {
+      if (message || amount) {
         outputEl.innerHTML = "<div class='ok'>Tolkning klar. Kontrollera fälten innan QR-koden genereras." +
-          (!message ? "<br>Blankettnummer hittades inte säkert." : "") +
-          (!amount ? "<br>Belopp hittades inte säkert." : "") + "</div>";
+          (!message ? "<br>Meddelande/blankettnummer hittades inte säkert." : "") +
+          (!amount ? "<br>Belopp under ”Betalt (inkl moms)” hittades inte säkert." : "") + "</div>";
       } else {
-        showError("Kunde inte hitta blankettnummer eller belopp säkert. Fyll i fälten manuellt eller justera OCR-texten.");
+        showError("Kunde inte hitta meddelande eller belopp säkert. Fyll i fälten manuellt eller justera OCR-texten.");
       }
     }
 
-    function findAmount(text) {
-      const normalized = text.replace(/\u00a0/g, " ").replace(/[Oo]/g, "0");
+    function normalizeOcrText(text) {
+      return String(text || "")
+        .replace(/\u00a0/g, " ")
+        .replace(/[|]/g, "I")
+        .replace(/[Oo]/g, "0");
+    }
+
+    function findSfroMessage(text) {
+      /*
+        Meddelandet ska vara blankett-/ärendenumret längst upp till höger:
+        B, M eller DB följt av löpnummer. Exempel: B12645, M123456, DB123456.
+
+        Regexen tillåter vissa OCR-missar/mellanslag mellan bokstav och siffror.
+      */
+      const t = normalizeOcrText(text).toUpperCase();
+
       const patterns = [
-        /(?:belopp|summa|att betala|totalt|sek|kr)\D{0,20}(\d{1,3}(?:[ .]\d{3})*(?:[,.]\d{1,2})?|\d+(?:[,.]\d{1,2})?)/i,
-        /(\d{1,3}(?:[ .]\d{3})*(?:[,.]\d{2})|\d+[,.]\d{2})\s*(?:kr|sek)?/i,
-        /(\d{2,6})\s*(?:kr|sek)/i
+        /\b(DB)\s*[-:]?\s*(\d{5,6})\b/,
+        /\b([BM])\s*[-:]?\s*(\d{5,6})\b/,
+        /(?:BLANKETTNUMMER|BLANKETT|ÄRENDE|ARBETORDER|ARBETSORDER)\D{0,40}\b(DB|[BM])\s*[-:]?\s*(\d{5,6})\b/
       ];
+
       for (const pattern of patterns) {
-        const match = normalized.match(pattern);
-        if (match && match[1]) return normalizeAmount(match[1]);
+        const match = t.match(pattern);
+        if (match) {
+          if (match.length >= 3) return (match[1] + match[2]).replace(/\s/g, "");
+        }
       }
+
       return "";
     }
 
-    function findFormNumber(text) {
-      const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-      const joined = lines.join(" ");
-      const patterns = [
-        /(?:blankett(?:nummer|nr)?|ärende(?:nummer|nr)?|besiktnings(?:nummer|nr)?|protokoll(?:nummer|nr)?|sfro)\D{0,20}([A-ZÅÄÖ]{0,5}\s*\d{3,8}(?:[-/]\d{1,4})?)/i,
-        /(SFRO\D{0,10}\d{3,8}(?:[-/]\d{1,4})?)/i,
-        /(?:nr|no|nummer)\D{0,10}(\d{3,8}(?:[-/]\d{1,4})?)/i
-      ];
+    function findPaidIncludingVatAmount(text) {
+      /*
+        Primär regel:
+        Leta efter ”Betalt (inkl moms)” och ta första beloppet därefter.
+        I blanketten står detta i vänstra spalten, medan ”Varav moms” står till höger.
+      */
+      const t = normalizeOcrText(text);
+      const compact = t.replace(/\r/g, "");
 
-      for (const pattern of patterns) {
-        const match = joined.match(pattern);
-        if (match && match[1]) return cleanMessage(match[1]);
+      const labelPattern = /Betalt\s*\(?\s*inkl\s*moms\s*\)?\s*:?/i;
+      const labelMatch = compact.match(labelPattern);
+
+      if (labelMatch && typeof labelMatch.index === "number") {
+        const after = compact.slice(labelMatch.index + labelMatch[0].length, labelMatch.index + labelMatch[0].length + 120);
+        const beforeVaravMoms = after.split(/Varav\s+moms/i)[0];
+
+        const amountMatch = beforeVaravMoms.match(/(\d{1,3}(?:[ .]\d{3})*|\d+)(?:[,.](\d{1,2}))?\s*(?:kr|sek)?/i);
+        if (amountMatch && amountMatch[1]) {
+          return normalizeAmount(amountMatch[1] + (amountMatch[2] ? "," + amountMatch[2] : ""));
+        }
       }
 
-      for (const line of lines) {
-        if (/belopp|summa|kr|sek|datum|telefon|mobil/i.test(line)) continue;
-        const match = line.match(/[A-ZÅÄÖ]{0,5}\s*\d{4,8}(?:[-/]\d{1,4})?/i);
-        if (match) return cleanMessage(match[0]);
+      /*
+        Sekundär regel:
+        Radbaserad tolkning. Hitta raden med Betalt och läs nästa rad med belopp.
+      */
+      const lines = t.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+      for (let i = 0; i < lines.length; i++) {
+        if (/Betalt\s*\(?\s*inkl\s*moms\s*\)?/i.test(lines[i])) {
+          const windowLines = lines.slice(i, i + 4).join(" ");
+          const amountMatch = windowLines.match(/Betalt.*?(\d{1,3}(?:[ .]\d{3})*|\d+)(?:[,.](\d{1,2}))?\s*(?:kr|sek)?/i);
+          if (amountMatch && amountMatch[1]) {
+            return normalizeAmount(amountMatch[1] + (amountMatch[2] ? "," + amountMatch[2] : ""));
+          }
+
+          for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
+            if (/Varav\s+moms/i.test(lines[j])) break;
+            const m = lines[j].match(/(\d{1,3}(?:[ .]\d{3})*|\d+)(?:[,.](\d{1,2}))?\s*(?:kr|sek)?/i);
+            if (m && m[1]) return normalizeAmount(m[1] + (m[2] ? "," + m[2] : ""));
+          }
+        }
       }
+
       return "";
-    }
-
-    function cleanMessage(value) {
-      return String(value || "").replace(/\s+/g, " ").replace(/[|]/g, "I").trim().substring(0, 50);
     }
 
     function normalizeAmount(raw) {
@@ -189,7 +233,7 @@
         value = value.slice(0, lastComma).replace(/,/g, "") + value.slice(lastComma);
       }
       if (!value) throw new Error("Ange belopp.");
-      if (!/^\d+(,\d{1,2})?$/.test(value)) throw new Error("Ange belopp som till exempel 500 eller 500,00.");
+      if (!/^\d+(,\d{1,2})?$/.test(value)) throw new Error("Ange belopp som till exempel 5000 eller 5000,00.");
       if (!value.includes(",")) value += ",00";
       else if (/,\d$/.test(value)) value += "0";
       const numeric = Number(value.replace(",", "."));
@@ -199,17 +243,23 @@
 
     function validateSwishNumber(number) {
       if (!/^\d+$/.test(number)) throw new Error("Swishnumret måste bara innehålla siffror. Ändra SWISH_NUMBER i HTML-filen.");
-      if (number === "1232139483") throw new Error("Du måste först ändra SWISH_NUMBER i HTML-filen till rätt Swishnummer.");
+      if (number === "123XXXXXXX") throw new Error("Du måste först ändra SWISH_NUMBER i HTML-filen till rätt Swishnummer.");
+    }
+
+    function validateMessage(message) {
+      const cleaned = String(message || "").trim().toUpperCase().replace(/\s/g, "");
+      if (!/^(DB|B|M)\d{5,6}$/.test(cleaned)) {
+        throw new Error("Meddelandet ska vara B, M eller DB följt av löpnummer, t.ex. B12645 eller DB123456.");
+      }
+      return cleaned;
     }
 
     function generateQr() {
       outputEl.innerHTML = "";
       try {
         validateSwishNumber(SWISH_NUMBER);
-        const message = messageEl.value.trim();
+        const message = validateMessage(messageEl.value);
         const amount = normalizeAmount(amountEl.value);
-        if (!message) throw new Error("Ange blankettnummer eller meddelande.");
-        if (message.length > 50) throw new Error("Meddelandet är långt. Kortare meddelande rekommenderas för Swish.");
 
         const payload = "C" + SWISH_NUMBER + ";" + amount + ";" + encodeURIComponent(message) + ";" + LOCK_MASK;
         const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=12&data=" + encodeURIComponent(payload);
